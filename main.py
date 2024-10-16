@@ -23,7 +23,7 @@ def set_seed(args):
 # seeds = [100, 200, 300, 400, 500]
 # layers_GCN = [2, 15, 30]
 seeds = [100, 200]
-layers_GCN = [2, 15, 30]
+layers_GCN = [2]
 
 def main(args):
     if args.type_model in ['GCN', 'GAT', 'GCNII', 'Cheby', 'DeepGCN']:

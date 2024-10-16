@@ -101,9 +101,6 @@ class GCN(nn.Module):
             x = self.layers_GCN[i](x, edge_index)
             x = self.layers_bn[i](x)
 
-            if i == 0:
-                X_i = x
-
             if self.training:
                 ######DeCorr######
                 # if self.alpha > 0 and i != self.num_layers - 1:
