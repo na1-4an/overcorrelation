@@ -17,7 +17,7 @@ from MI.kde import mi_kde
 def load_data(dataset="Cora"):
     path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data', dataset)
     if dataset in ["Cora", "Citeseer", "Pubmed"]:
-        data = Planetoid(path, dataset, T.NormalizeFeatures())[0]
+        data = Planetoid(path, dataset, split='public', transform=T.NormalizeFeatures())[0]
         num_nodes = data.x.size(0)
         edge_index, _ = remove_self_loops(data.edge_index)
         edge_index = add_self_loops(edge_index, num_nodes=num_nodes)
@@ -179,8 +179,8 @@ class trainer(object):
             #                                                                              acc_valid, acc_test))
 
             if (epoch %100==0):
-                print('Epoch: {:02d}, train_acc: {:.4f}, val_acc: {:.4f}, test_acc:{:.4f}, corr:{:.4f}, sim:{:.4f}'.format(epoch,
-                    acc_train, acc_valid, acc_test, self.model.corr, self.model.sim))
+                print('Epoch: {:02d}, train_acc: {:.4f}, loss: {:.4f}, val_acc: {:.4f}, test_acc:{:.4f}, corr:{:.4f}, sim:{:.4f}'.format(epoch, 
+                    acc_train, loss_train, acc_valid, acc_test, self.model.corr, self.model.sim))
                 # print('Epoch: {:02d}, train_acc: {:.4f}, val_acc: {:.4f}, test_acc:{:.4f}, corr:{:.4f}, corr_2:{:.4f}'.format(epoch,
                 #     acc_train, acc_valid, acc_test, self.model.corr, self.model.corr_2))
 
@@ -240,7 +240,7 @@ class trainer(object):
 
     def run_trainSet(self):
         self.model.train()
-        logits = self.model(self.data.x, self.data.edge_index)
+        logits = self.model(self.data.x, self.data.edge_index, self.data.y)
         logits = F.log_softmax(logits[self.data.train_mask], 1)
         loss = self.loss_fn(logits, self.data.y[self.data.train_mask])
         # if self.model.alpha > 0:
@@ -324,4 +324,3 @@ class trainer(object):
         state = self.model.state_dict()
         torch.save(state, filename)
         # print('save model to', filename)
-

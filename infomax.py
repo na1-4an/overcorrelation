@@ -53,4 +53,3 @@ class Infomax(nn.Module):
         logits = self.forward(f_x, pos, neg)
         loss = self.bce(logits, self.labels)
         return loss
-
