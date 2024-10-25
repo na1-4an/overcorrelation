@@ -1,5 +1,5 @@
 from options.base_options import BaseOptions, reset_weight
-from trainer_decorr import trainer
+from trainer_deprop import trainer
 import torch
 import os
 import numpy as np
@@ -20,8 +20,6 @@ def set_seed(args):
     # PyTorch에서 결정론적 알고리즘 강제 설정 (1.12.1+에서는 지원)
     torch.use_deterministic_algorithms(True, warn_only=True)
 
-# seeds = [100, 200, 300, 400, 500]
-# layers_GCN = [2, 15, 30]
 seeds = [100, 200]
 layers_GCN = [2, 15, 30]
 
@@ -30,7 +28,7 @@ def main(args):
         layers = layers_GCN
     else:
         layers = layers_SGCN
-    print(args.weight_decay)
+
     acc_test_layers = []
     MI_XiX_layers = []
     dis_ratio_layers = []
@@ -73,6 +71,7 @@ def main(args):
     print('number of layers: ', layers)
     print('test accuracies: ', acc_test_layers)
     print('Mean of corr_2, corr, sim_2, sim:', outs_layers)
+
     log_file = 'experiment_results.log'  # 로그 파일 이름
 
     # 로그 파일 열기 (쓰기 모드, 기존 내용은 덮어씀)
@@ -84,6 +83,7 @@ def main(args):
         f.write(f'number of layers: {layers}\n')
         f.write(f'test accuracies: {acc_test_layers}\n')
         f.write(f'Mean of corr_2, corr, sim_2, sim: {outs_layers}\n\n')
+
 
 if __name__ == "__main__":
     args = BaseOptions().initialize()

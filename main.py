@@ -23,7 +23,7 @@ def set_seed(args):
 # seeds = [100, 200, 300, 400, 500]
 # layers_GCN = [2, 15, 30]
 seeds = [100, 200]
-layers_GCN = [2]
+layers_GCN = [2, 15, 30]
 
 def main(args):
     if args.type_model in ['GCN', 'GAT', 'GCNII', 'Cheby', 'DeepGCN']:
@@ -73,6 +73,19 @@ def main(args):
     print('number of layers: ', layers)
     print('test accuracies: ', acc_test_layers)
     print('Mean of corr_2, corr, sim_2, sim:', outs_layers)
+
+    log_file = 'experiment_results.log'  # 로그 파일 이름
+
+    # 로그 파일 열기 (쓰기 모드, 기존 내용은 덮어씀)
+    with open(log_file, 'a') as f:  # 'a' 모드는 append, 즉 기존 파일에 덧붙이기
+        # 로그 파일에 결과 쓰기
+        f.write(f'<dataset: {args.dataset}>experiment results of {args.type_norm} applied in {args.type_model}' +
+                f'on dataset {args.dataset} with dropout {args.dropout}, dropedge {args.dropedge}'+
+                f'lr {args.lr}, alpha {args.alpha}, beta {args.beta}\n')
+        f.write(f'number of layers: {layers}\n')
+        f.write(f'test accuracies: {acc_test_layers}\n')
+        f.write(f'Mean of corr_2, corr, sim_2, sim: {outs_layers}\n\n')
+
 
 if __name__ == "__main__":
     args = BaseOptions().initialize()

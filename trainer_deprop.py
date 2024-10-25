@@ -1,10 +1,9 @@
 import torch
 import os
-from models.GCN_decorr import GCN
-from models.GAT import GAT
-from models.Cheby import Cheby
+from models.model_deprop import get_model
 from torch_geometric.datasets import Planetoid
 from torch_geometric.datasets import Coauthor, Amazon
+import torch_sparse
 
 import torch_geometric.transforms as T
 import torch.nn.functional as F
@@ -13,6 +12,7 @@ from torch_geometric.utils import remove_self_loops, add_self_loops
 import numpy as np
 from MI.kde import mi_kde
 
+from ogb.nodeproppred import Evaluator
 
 def load_data(dataset="Cora"):
     path = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'data', dataset)
@@ -25,6 +25,11 @@ def load_data(dataset="Cora"):
             data.edge_index = edge_index[0]
         else:
             data.edge_index = edge_index
+
+        # adj_t 생성 (전치된 희소 인접 행렬)
+        adj_t = torch_sparse.SparseTensor(row=data.edge_index[0], col=data.edge_index[1], sparse_sizes=(num_nodes, num_nodes))
+        data.adj_t = adj_t.t()  # 전치 행렬
+
         return data
     elif dataset in ['CoauthorCS', 'CoauthorPhysics']:
         data = Coauthor(path, dataset[8:].lower(), T.NormalizeFeatures())[0]
@@ -118,30 +123,24 @@ class trainer(object):
         self.epochs = args.epochs
         self.grad_clip = args.grad_clip
         self.weight_decay = args.weight_decay
-        if self.type_model == 'GCN':
-            self.model = GCN(args)
-        elif self.type_model == 'simpleGCN':
-            self.model = simpleGCN(args)
-        elif self.type_model == 'GAT':
-            self.model = GAT(args)
-        elif self.type_model == 'Cheby':
-            self.model = Cheby(args)
-        elif self.type_model == 'ResGCN':
-            self.model = ResGCN(args)
-        elif self.type_model == 'DeepGCN':
-            self.model = DeepGCN(args)
-        else:
-            raise Exception(f'the model of {self.type_model} has not been implemented')
+
+
+        self.model = get_model(args, self.dataset)
+
 
         self.data.to(self.device)
         self.model.to(self.device)
-
         self.optimizer = torch.optim.Adam(self.model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
         self.seed = args.random_seed
         self.type_norm = args.type_norm
         self.skip_weight = args.skip_weight
         self.args = args
+
+        self.split_idx = {}
+        self.split_idx['train'] = self.mask_to_index(self.data.train_mask)
+        self.split_idx['valid'] = self.mask_to_index(self.data.val_mask)
+        self.split_idx['test']  = self.mask_to_index(self.data.test_mask)
 
         ###
         self.steplr = args.steplr
@@ -240,36 +239,56 @@ class trainer(object):
 
     def run_trainSet(self):
         self.model.train()
-        logits = self.model(self.data.x, self.data.edge_index)
-        logits = F.log_softmax(logits[self.data.train_mask], 1)
-        loss = self.loss_fn(logits, self.data.y[self.data.train_mask])
-        # if self.model.alpha > 0:
-        # print(self.model.loss_corr)
-        loss += self.model.loss_corr
-
         self.optimizer.zero_grad()
-        loss.backward()
-        if self.grad_clip > 0:
-            torch.nn.utils.clip_grad_norm(self.model.parameters(), self.grad_clip)
-        self.optimizer.step()
-        if self.steplr:
-            scheduler.step()
-        if self.model.alpha > 0 or self.model.loss_corr!=0:
-            self.model.loss_corr = 0
+        out = self.model(x=self.data.x, y=self.data.y, adj_t=self.data.adj_t)[self.data.train_mask]
+        if len(self.data.y.shape) == 1:
+            y = self.data.y[self.data.train_mask]
+        else:
+            y = self.data.y.squeeze(1)[self.data.train_mask]  ## for ogb data
 
+        loss = F.nll_loss(out, y)
+        loss += self.model.loss_corr
+        loss.backward()
+        self.optimizer.step()
+        if self.model.loss_corr!=0:
+            self.model.loss_corr = 0
         return loss.item()
 
-    def run_testSet(self, report_metrics=False):
-        self.model.eval()
-        # torch.cuda.empty_cache()
-        with torch.no_grad():
-            logits = self.model(self.data.x, self.data.edge_index, report_metrics)
-        logits = F.log_softmax(logits, 1)
-        acc_train = evaluate(logits, self.data.y, self.data.train_mask)
-        acc_valid = evaluate(logits, self.data.y, self.data.val_mask)
-        acc_test = evaluate(logits, self.data.y, self.data.test_mask)
-        return acc_train, acc_valid, acc_test
 
+    def mask_to_index(self, mask):
+        index = torch.where(mask == True)[0].cuda()
+        return index
+
+
+    def run_testSet(self, report_metrics=False):        
+
+        self.model.eval()
+        with torch.no_grad():
+            out = self.model(x=self.data.x, y=self.data.y, adj_t=self.data.adj_t)
+
+
+        y_pred = out.argmax(dim=-1, keepdim=True)
+        if len(self.data.y.shape) == 1:
+            y = self.data.y.unsqueeze(dim=1) # for non ogb datas
+        else:
+            y = self.data.y
+
+        evaluator = Evaluator(name='ogbn-arxiv')
+        train_acc = evaluator.eval({
+            'y_true': y[self.split_idx['train']],
+            'y_pred': y_pred[self.split_idx['train']],
+        })['acc']
+        valid_acc = evaluator.eval({
+            'y_true': y[self.split_idx['valid']],
+            'y_pred': y_pred[self.split_idx['valid']]
+        })['acc']
+        test_acc = evaluator.eval({
+            'y_true': y[self.split_idx['test']],
+            'y_pred': y_pred[self.split_idx['test']],
+        })['acc']
+
+
+        return train_acc, valid_acc, test_acc
 
     def filename(self, filetype='logs', type_model='GCN', dataset='PPI'):
         filedir = f'./{filetype}/{dataset}'

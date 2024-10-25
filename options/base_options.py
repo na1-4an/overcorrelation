@@ -1,5 +1,5 @@
 import argparse
-
+from models.util_deprop import str2bool
 def reset_weight(args):
     if args.dataset == 'Citeseer' and args.miss_rate == 0.:
         if args.type_model in ['GAT', 'GCN', 'Cheby']:
@@ -108,11 +108,20 @@ class BaseOptions():
         parser.add_argument('--loss_weight', type=float, default=0.)
 
         ####
-        parser.add_argument('--alpha', type=float, default=0.)
-        parser.add_argument('--beta', type=float, default=0.)
+        parser.add_argument('--alpha', type=float, default=1)
+        parser.add_argument('--beta', type=float, default=10)
         parser.add_argument('--gamma', type=float, default=0.)
         parser.add_argument('--steplr', type=int, default=0)
         parser.add_argument('--dropedge', type=float, default=0)
+
+        ## for deprop
+        parser.add_argument('--lambda1', type=float, default=100)
+        parser.add_argument('--lambda2', type=float, default=0.003)
+        parser.add_argument('--gamma2', type=float, default=0.005)
+        parser.add_argument('--orth', type=str2bool, default=True)
+        parser.add_argument('--with_bn', type=str2bool, default=True)   
+        parser.add_argument('--F_norm', type=str2bool, default=False)
+        parser.add_argument('--smooth', type=str2bool, default=True)
 
         args = parser.parse_args()
         args = self.reset_model_parameter(args)

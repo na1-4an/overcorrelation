@@ -102,19 +102,12 @@ class GCN(nn.Module):
             x = self.layers_bn[i](x)
 
             if self.training:
-                ######DeCorr######
-                # if self.alpha > 0 and i != self.num_layers - 1:
-                #     self.loss_corr += self.alpha * loss_corr(x)
 
                 ####input x <-> hidden representation x 간의 infomax######
                 if self.beta > 0 and i!=self.num_layers-1 and i%5==4:
+                    print(x_1.shape, x.shape)
+
                     self.loss_corr += self.beta * self.infomax.get_loss(x_1, x)
-
-
-                ######Sparse######
-                # if  i == self.num_layers // 2:
-                #     mask = torch.rand(x.shape, device=x.device) > 0.1  # 10% chance of masking
-                #     x = x * mask.float()  # Apply the mask to make x sparse
 
                 ######My Method######
                 if self.beta > 0 and i!=self.num_layers-1 and i%2==1:
@@ -125,6 +118,11 @@ class GCN(nn.Module):
 
                     self.loss_corr += (self.infomax2.get_loss(f_i, y) + self.infomax2.get_loss(f_j, y) + cc3)/3
                 
+                
+                ######Sparse######
+                # if  i == self.num_layers // 2:
+                #     mask = torch.rand(x.shape, device=x.device) > 0.1  # 10% chance of masking
+                #     x = x * mask.float()  # Apply the mask to make x sparse
 
 
             if i == self.num_layers-2:
